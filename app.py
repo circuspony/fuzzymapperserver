@@ -8,11 +8,9 @@ import pandas as pd
 import dataframe_image as dfi
 import calendar
 import time
-import math
 import uuid
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import statsmodels.api as sm
 from sklearn.decomposition import PCA
