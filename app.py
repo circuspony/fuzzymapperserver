@@ -24,10 +24,56 @@ CORS(app)
 def index():
     return 'Index Page'
 
+def findOutliersIn(dataArray):
+    newObjects = []
+    for valueArray in dataArray:
+        valueArrayNew = list(map(lambda v: float(v), valueArray))
+        valueArrayNew = np.array(valueArrayNew)
+        valueArrayNew= np.sort(valueArrayNew) 
+        q25=np.quantile(valueArrayNew, 0.25)
+        q75=np.quantile(valueArrayNew, 0.75)
+        IQD=q75-q25
+        outlierLower15 = q25-1.5*IQD
+        outlierHigher15 = q75+1.5*IQD
+        outlierLower30 = q25-3*IQD
+        outlierHigher30 = q75+3*IQD
+        objectSet={}
+        objectSet["ol15"]=outlierLower15
+        objectSet["oh15"]=outlierHigher15
+        objectSet["ol30"]=outlierLower30
+        objectSet["oh30"]=outlierHigher30
+        outlierArray =[]
+        membershipsArray =[]
+        for v in valueArray:
+            on = outlierNumber(v,outlierLower15,outlierHigher15)
+            outlierArray.append(on)
+            if on==1:
+                membershipsArray.append(outlierLowMembership(float(v),float(outlierLower15),float(outlierLower30)))
+            if on==2:
+                membershipsArray.append(outlierHighMembership(float(v),float(outlierHigher15),float(outlierHigher30)))
+            if on==0:
+                membershipsArray.append(0)
+        objectSet["outlierArray"]=outlierArray
+        objectSet["membershipsArray"]=membershipsArray
+        newObjects.append(objectSet)
+    outlierArray = newObjects[0]["outlierArray"]
+    membershipsArray = newObjects[0]["membershipsArray"]
+    for a in newObjects:
+        for oi in range(len(a["outlierArray"])):
+            if a["outlierArray"][oi]!=0:
+                outlierArray[oi]=a["outlierArray"][oi]
+            if a["membershipsArray"][oi]!=0:
+                membershipsArray[oi]=a["membershipsArray"][oi]
+    return {
+        "o":outlierArray,
+        "m":membershipsArray
+    }
+
 @app.route('/clusters', methods=['POST'])
 async def clusters():
     if request.method == 'POST':
         content = request.json
+        outliers = findOutliersIn(content["data"])
         l0 = map(lambda x: [x], content["data"][0])
         result =  np.array(list(l0))
         for index in range(len(content["data"])):
@@ -36,7 +82,13 @@ async def clusters():
                 a0 =  np.array(list(l0))
                 result = np.hstack((result,a0))
         X = result.astype(float)
-        print(X)
+        newX =  []
+        for notOi in range(len(outliers["o"])):
+            if outliers["o"][notOi]==0:
+                newX.append(X[notOi].tolist())
+        newX =  np.array(newX)
+        if content["outlier"]==True:
+            X=newX
         fcm_centers=None
         fcm_labels=None
         if content["cmethod"]=="CM":
@@ -48,6 +100,22 @@ async def clusters():
           m,v,f = GK(X,c = content["clusters"])
           fcm_centers = v.tolist()
           fcm_labels = m.tolist()
+        if content["outlier"]==True:
+            for i in range(len(fcm_labels)):
+                label=fcm_labels[i]
+                label.insert(0, 0)
+                label.append(0)
+                fcm_labels[i]=label
+            for notOi in range(len(outliers["o"])):
+                if outliers["o"][notOi]==1:
+                    m = [0]*len(fcm_labels[0])
+                    m[0]=outliers["m"][notOi]
+                    fcm_labels.insert(notOi, m)
+                if outliers["o"][notOi]==2:
+                    m = [0]*len(fcm_labels[0])
+                    m[len(fcm_labels[0])-1]=outliers["m"][notOi]
+                    fcm_labels.insert(notOi, m)
+        print(len(fcm_labels))
         return {
         "status": "ok",
         "centers":fcm_centers,
@@ -59,6 +127,7 @@ async def clusters():
         "headers": {"Access-Control-Allow-Origin": "*"}
     }
 
+
 @app.route('/correlations', methods=['POST'])
 async def correlations():
     if request.method == 'POST':
@@ -68,12 +137,74 @@ async def correlations():
             dfData[content["fields"][nameIndex]]= list(np.float_(content["data"][nameIndex])) 
         pd.set_option('display.max_colwidth', 0)
         df = pd.DataFrame(data=dfData)
-        corr = df.corr().style.set_table_styles([{'selector': 'th', 'props': 'background-color: rgb(245 243 255)'}]).set_table_styles([{'selector': 'tr', 'props': 'background-color: rgb(245 243 255)'}]).background_gradient(cmap='coolwarm').set_precision(3)
-        fname = 'pictures/{}.png'.format(calendar.timegm(time.gmtime()))
-        dfi.export(corr, fname)
         return {
         "status": "ok",
-        "corr":fname,
+        "corr":df.corr().to_numpy().tolist(),
+        "headers": {"Access-Control-Allow-Origin": "*"}
+        }
+    return {
+        "status": "error",
+        "headers": {"Access-Control-Allow-Origin": "*"}
+    }
+
+def is_float(element: any) -> bool:
+    if element is None: 
+        return False
+    try:
+        float(element)
+        return True
+    except ValueError:
+        return False
+
+def is_int(element: any) -> bool:
+    if element is None: 
+        return False
+    try:
+        int(element)
+        return True
+    except ValueError:
+        return False
+
+def outlierNumber(num,lb,hb):
+    if float(num)>hb:
+        return 2
+    if float(num)<lb:
+        return 1
+    return 0
+
+@app.route('/outlier', methods=['POST'])
+async def outlier():
+    if request.method == 'POST':
+        content = request.json
+        newObjects = []
+        for objectSet in request.json["data"]:
+            isNumber = True
+            for o in objectSet["values"]:
+                if is_int(o["value"])==False and is_float(o["value"])==False:
+                    isNumber = False
+                    break
+            if (isNumber):
+                objectArray = list(map(lambda os: float(os["value"]), objectSet["values"]))
+                objectArray = np.array(objectArray)
+                objectArray= np.sort(objectArray) 
+                q25=np.quantile(objectArray, 0.25)
+                q75=np.quantile(objectArray, 0.75)
+                IQD=q75-q25
+                outlierLower15 = q25-1.5*IQD
+                outlierHigher15 = q75+1.5*IQD
+                outlierLower30 = q25-3*IQD
+                outlierHigher30 = q75+3*IQD
+                objectSet["ol15"]=outlierLower15
+                objectSet["oh15"]=outlierHigher15
+                objectSet["ol30"]=outlierLower30
+                objectSet["oh30"]=outlierHigher30
+                for o in objectSet["values"]:
+                    o["outlier"]=outlierNumber(o["value"],outlierLower15,outlierHigher15)
+            newObjects.append(objectSet)
+
+        return {
+        "status": "ok",
+        "objectSet":newObjects,
         "headers": {"Access-Control-Allow-Origin": "*"}
         }
     return {
@@ -151,6 +282,17 @@ def trapezoid():
 def send_report(path):
     return send_from_directory('pictures', path)
 
+def outlierLowMembership(val,o15,o30):
+    if val<o30:
+        return 1
+    membershipValue = (o15-val)/(o15-o30)
+    return membershipValue
+
+def outlierHighMembership(val,o15,o30):
+    if val>o30:
+        return 1
+    membershipValue = (val-o15)/(o30-o15)
+    return membershipValue    
 
 def triangleMembership(value,functionSets):
     value = float(value)
@@ -213,6 +355,18 @@ def fuzzy():
             if fs["type"] == 0:
                 for value in fs["values"]:
                     mv = triangleMembership(value["value"],fs["functionSets"])
+                    if fs["outlier"] == True:
+                        if value["outlier"]==0:
+                            mv.insert(0, 0)
+                            mv.append(0)
+                        if value["outlier"]==1:
+                            ml = outlierLowMembership(float(value["value"]),float(fs["ol15"]),float(fs["ol30"]))
+                            mv.insert(0, ml)
+                            mv.append(0)
+                        if value["outlier"]==2:
+                            mv.insert(0, 0)
+                            mh=outlierHighMembership(float(value["value"]),float(fs["oh15"]),float(fs["oh30"]))
+                            mv.append(mh)
                     if fs["external"] == True:
                         mv = list(map(lambda v: min(v,value["eval"]), mv))
                     mv = list(map(lambda v: min(v,abs(float(fs["coef"]))), mv))
@@ -224,6 +378,18 @@ def fuzzy():
             if fs["type"] == 1:
                 for value in fs["values"]:
                     mv = trapezoidMembership(value["value"],fs["functionSets"])
+                    if fs["outlier"] == True:
+                        if value["outlier"]==0:
+                            mv.insert(0, 0)
+                            mv.append(0)
+                        if value["outlier"]==1:
+                            ml = outlierLowMembership(float(value["value"]),float(fs["ol15"]),float(fs["ol30"]))
+                            mv.insert(0, ml)
+                            mv.append(0)
+                        if value["outlier"]==2:
+                            mv.insert(0, 0)
+                            mh=outlierHighMembership(float(value["value"]),float(fs["oh15"]),float(fs["oh30"]))
+                            mv.append(mh)
                     if fs["external"] == True:
                         mv = list(map(lambda v: min(v,value["eval"]), mv))
                     mv = list(map(lambda v: min(v,abs(float(fs["coef"]))), mv))
