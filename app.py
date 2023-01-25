@@ -172,36 +172,43 @@ def outlierNumber(num,lb,hb):
         return 1
     return 0
 
+def outlierFuzzy(data):
+    newObjects = []
+    for objectSet in data:
+        isNumber = True
+        for o in objectSet["values"]:
+            if is_int(o["value"])==False and is_float(o["value"])==False:
+                isNumber = False
+                break
+        if (isNumber):
+            objectArray = list(map(lambda os: float(os["value"]), objectSet["values"]))
+            objectArray = np.array(objectArray)
+            objectArray= np.sort(objectArray) 
+            q25=np.quantile(objectArray, 0.25)
+            q75=np.quantile(objectArray, 0.75)
+            IQD=q75-q25
+            outlierLower15 = q25-1.5*IQD
+            outlierHigher15 = q75+1.5*IQD
+            outlierLower30 = q25-3*IQD
+            outlierHigher30 = q75+3*IQD
+            objectSet["ol15"]=outlierLower15
+            objectSet["oh15"]=outlierHigher15
+            objectSet["ol30"]=outlierLower30
+            objectSet["oh30"]=outlierHigher30
+            for o in objectSet["values"]:
+                o["outlier"]=outlierNumber(o["value"],outlierLower15,outlierHigher15)
+            newObjects.append(objectSet)
+    return newObjects
+
 @app.route('/outlier', methods=['POST'])
 async def outlier():
     if request.method == 'POST':
-        content = request.json
         newObjects = []
         for objectSet in request.json["data"]:
-            isNumber = True
-            for o in objectSet["values"]:
-                if is_int(o["value"])==False and is_float(o["value"])==False:
-                    isNumber = False
-                    break
-            if (isNumber):
-                objectArray = list(map(lambda os: float(os["value"]), objectSet["values"]))
-                objectArray = np.array(objectArray)
-                objectArray= np.sort(objectArray) 
-                q25=np.quantile(objectArray, 0.25)
-                q75=np.quantile(objectArray, 0.75)
-                IQD=q75-q25
-                outlierLower15 = q25-1.5*IQD
-                outlierHigher15 = q75+1.5*IQD
-                outlierLower30 = q25-3*IQD
-                outlierHigher30 = q75+3*IQD
-                objectSet["ol15"]=outlierLower15
-                objectSet["oh15"]=outlierHigher15
-                objectSet["ol30"]=outlierLower30
-                objectSet["oh30"]=outlierHigher30
-                for o in objectSet["values"]:
-                    o["outlier"]=outlierNumber(o["value"],outlierLower15,outlierHigher15)
-            newObjects.append(objectSet)
-
+            print('objectSet')
+            print(objectSet)
+            outliers = outlierFuzzy(objectSet)
+            newObjects.append(outliers)
         return {
         "status": "ok",
         "objectSet":newObjects,
