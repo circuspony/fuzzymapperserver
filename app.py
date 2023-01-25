@@ -569,6 +569,10 @@ def clustercomp():
         result = []
         for mr in range(len(matrix)):
             summr = sum(matrix[mr])
+            if summr == 0:
+                result.append(0)
+                continue
+
             maxPercent = -999
             for m in range(len(matrix[mr])):
                 if matrix[mr][m]/summr>maxPercent:
