@@ -433,6 +433,36 @@ def fuzzy():
         "headers": {"Access-Control-Allow-Origin": "*"}
     }
 
+def outlierRegression(x,y):
+    print("GO")
+
+    X= np.sort(x) 
+    q25=np.quantile(X, 0.25)
+    q75=np.quantile(X, 0.75)
+    IQD=q75-q25
+    outlierLower15 = q25-1.5*IQD
+    outlierHigher15 = q75+1.5*IQD
+    outlierLower30 = q25-3*IQD
+    outlierHigher30 = q75+3*IQD
+    outliers = []
+    for xo in x:
+        if xo>outlierHigher15 or xo<outlierLower15:
+            outliers.append(1)
+            continue
+        outliers.append(0)
+    Y= np.sort(y) 
+    q25=np.quantile(Y, 0.25)
+    q75=np.quantile(Y, 0.75)
+    IQD=q75-q25
+    outlierLower15 = q25-1.5*IQD
+    outlierHigher15 = q75+1.5*IQD
+    outlierLower30 = q25-3*IQD
+    outlierHigher30 = q75+3*IQD
+    for yi in range(len(y)):
+        if y[yi]>outlierHigher15 or y[yi]<outlierLower15:
+            outliers[yi]=1
+            print("o")
+    return outliers
     
 @app.route('/regression', methods=['POST'])
 def regression():
@@ -445,29 +475,34 @@ def regression():
                 X =  (X-np.min(X))/(np.max(X)-np.min(X))
                 y = np.array(list(fei["values"])).astype(float)
                 y =  (y-np.min(y))/(np.max(y)-np.min(y))
+                outliers = outlierRegression(X,y)
+                newX=[]
+                newY=[]
+                for xi in range(len(X)):
+                    if outliers[xi]==0:
+                        newX.append(X[xi])
+                        newY.append(y[xi])
+                if (content["data"]["outlier"]==True):
+                    X=np.array(newX)
+                    y=np.array(newY)
                 X_ = sm.add_constant(X.reshape(-1,1))
                 model = sm.OLS(y, X_).fit()
                 predictions = model.predict(X_)
-                fig = Figure(figsize=(7,5))
-                axis = fig.add_subplot(1, 1, 1)
-                axis.plot(X, predictions, c = np.random.rand(3,))
-                axis.scatter(X, y)
-                fig.gca().set_facecolor((0.960784,0.952941176,1))
-                fig.patch.set_facecolor((0.960784,0.952941176,1))
-                fname = 'pictures/{}.png'.format(uuid.uuid4())
-                fig.savefig(fname)
                 b = model.params.tolist()[1]
+                a = model.params.tolist()[0]
                 r2 = model.rsquared
                 F = model.fvalue
                 p = model.f_pvalue
                 data={
                     "from":fsi["name"],
                     "to":fei["name"],
-                    "fname":fname,
                     "b":b,
                     "r2":r2,
                     "F":F,
-                    "p":p
+                    "p":p,
+                    "x":X.tolist(),
+                    "y":y.tolist(),
+                    "a":a
                 }
                 regressions.append(data)
 
@@ -520,27 +555,33 @@ def pca():
         # yr =  np.array(list(l))
         X =  (xr-np.min(xr))/(np.max(xr)-np.min(xr))
         y =  (yr-np.min(yr))/(np.max(yr)-np.min(yr))
+        
+        outliers = outlierRegression(X,y)
+        newX=[]
+        newY=[]
+        for xi in range(len(X)):
+            if outliers[xi]==0:
+                newX.append(X[xi])
+                newY.append(y[xi])
+        if (content["data"]["outlier"]==True):
+            X=np.array(newX)
+            y=np.array(newY)
         X_ = sm.add_constant(X.reshape(-1,1))
         model = sm.OLS(y, X_).fit()
         predictions = model.predict(X_)
-        fig = Figure(figsize=(7,5))
-        axis = fig.add_subplot(1, 1, 1)
-        axis.plot(X, predictions, c = np.random.rand(3,))
-        axis.scatter(X, y)
-        fig.gca().set_facecolor((0.960784,0.952941176,1))
-        fig.patch.set_facecolor((0.960784,0.952941176,1))
-        fname = 'pictures/{}.png'.format(uuid.uuid4())
-        fig.savefig(fname)
         b = model.params.tolist()[1]
+        a = model.params.tolist()[0]
         r2 = model.rsquared
         F = model.fvalue
         p = model.f_pvalue
         data = {
-                    "fname":fname,
                     "b":b,
                     "r2":r2,
                     "F":F,
-                    "p":p
+                    "p":p,
+                    "x":X.tolist(),
+                    "y":y.tolist(),
+                    "a":a
                 }
         return {
         "status": "ok",
