@@ -643,7 +643,9 @@ async def accumulation():
                     ysum=0
                     for termIndex in range(len(rule["combo"])):
                         factor=content["data"][termIndex]
-                        termLabelIndex=factor["labels"].index(rule["combo"][termIndex])
+                        
+                        factorLabels = list(map(lambda l: str(l), factor["labels"]))
+                        termLabelIndex=factorLabels.index(str(rule["combo"][termIndex]))
                         objectMu = factor["fevals"][objectIndex][termLabelIndex]
                         if (mu>objectMu):
                             mu = objectMu
