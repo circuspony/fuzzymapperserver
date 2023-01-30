@@ -115,7 +115,6 @@ async def clusters():
                     m = [0]*len(fcm_labels[0])
                     m[len(fcm_labels[0])-1]=outliers["m"][notOi]
                     fcm_labels.insert(notOi, m)
-        print(len(fcm_labels))
         return {
         "status": "ok",
         "centers":fcm_centers,
@@ -205,8 +204,6 @@ async def outlier():
     if request.method == 'POST':
         newObjects = []
         for objectSet in request.json["data"]:
-            print('objectSet')
-            print(objectSet)
             outliers = outlierFuzzy(objectSet)
             newObjects.append(outliers)
         return {
@@ -434,7 +431,6 @@ def fuzzy():
     }
 
 def outlierRegression(x,y):
-    print("GO")
 
     X= np.sort(x) 
     q25=np.quantile(X, 0.25)
@@ -461,7 +457,6 @@ def outlierRegression(x,y):
     for yi in range(len(y)):
         if y[yi]>outlierHigher15 or y[yi]<outlierLower15:
             outliers[yi]=1
-            print("o")
     return outliers
     
 @app.route('/regression', methods=['POST'])
@@ -625,6 +620,47 @@ def clustercomp():
         "status": "ok",
         "result":result,
         "matrix":matrix,
+        "headers": {"Access-Control-Allow-Origin": "*"}
+        }
+    return {
+        "status": "error",
+        "headers": {"Access-Control-Allow-Origin": "*"}
+    }
+
+@app.route('/accumulation', methods=['POST'])
+async def accumulation():
+    if request.method == 'POST':
+        content = request.json
+        newObjects = []
+        for objectIndex in range(len(content["data"][0]["fevals"])):
+            upper=0
+            lower=0
+            rulemu = []
+            ruley = []
+            for combosArray in content["icombos"]:
+                for rule in content["rulebase"]:
+                    mu = 1
+                    ysum=0
+                    for termIndex in range(len(rule["combo"])):
+                        factor=content["data"][termIndex]
+                        termLabelIndex=factor["labels"].index(rule["combo"][termIndex])
+                        objectMu = factor["fevals"][objectIndex][termLabelIndex]
+                        if (mu>objectMu):
+                            mu = objectMu
+                    for termIndex in range(len(rule["evals"])):
+                        ysum=ysum+rule["evals"][termIndex]/sum(rule["evals"])*float(combosArray[termIndex]["values"][objectIndex])
+                    rulemu.append(mu) 
+                    ruley.append(ysum)
+            for index in range(len(rulemu)):
+                upper=upper+rulemu[index]*ruley[index]
+                lower=lower+rulemu[index]
+            result = 0
+            if lower!=0:
+                result=upper/lower
+            newObjects.append(result)
+        return {
+        "status": "ok",
+        "predictions":newObjects,
         "headers": {"Access-Control-Allow-Origin": "*"}
         }
     return {
