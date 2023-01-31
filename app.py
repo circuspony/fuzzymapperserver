@@ -669,3 +669,15 @@ async def accumulation():
         "status": "error",
         "headers": {"Access-Control-Allow-Origin": "*"}
     }
+
+@app.route('/test', methods=['POST'])
+async def test():
+    if request.method == 'POST':
+        return {
+        "status": "ok",
+        "headers": {"Access-Control-Allow-Origin": "*"}
+        }
+    return {
+        "status": "error",
+        "headers": {"Access-Control-Allow-Origin": "*"}
+    }
