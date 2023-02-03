@@ -199,11 +199,60 @@ def outlierFuzzy(data):
             newObjects.append(objectSet)
     return newObjects
 
+def makeDynamic(data):
+    newData=[]
+    names=[]
+    keyNames=[]
+    dateName=None
+    fdict={}
+    for objectSet in data:
+        if (objectSet["key"]):
+            keyNames.append(objectSet["title"])
+        else:
+            if (objectSet["date"]):
+                dateName = objectSet["title"]
+            else:
+                names.append(objectSet["title"])
+        v = list(map(lambda v: v["value"], objectSet["values"]))
+        fdict[objectSet["title"]]=v
+    df = pd.DataFrame(fdict)
+    uniqueNames = df[keyNames[0]].unique()
+    dfNew=pd.DataFrame({})
+    for name in uniqueNames:
+        dfTemp=pd.DataFrame({})
+        dfTemp = df[df[keyNames[0]]==name].reset_index(drop=True)
+        dfTemp[dateName]= dfTemp[dateName].astype(float)
+        minDate =  dfTemp[dateName].min()
+        minDateIndex =  dfTemp[dfTemp[dateName]==minDate].index.item()
+        for restName in names:
+            dfTemp[restName]=(dfTemp[restName]).astype(float)
+            dfTemp[restName]=dfTemp[restName]-float(dfTemp[restName][minDateIndex])
+        dfNew=  pd.concat([dfNew,dfTemp], ignore_index=True)
+    for restName in names:
+        dfNew[restName] = np.where(dfNew[restName] < 0, dfNew[restName]/abs(dfNew[restName].min()), dfNew[restName])
+        dfNew[restName] = np.where(dfNew[restName] > 0, dfNew[restName]/dfNew[restName].max(), dfNew[restName])
+    for dataset in data:
+        newVals = dfNew[dataset["title"]].values.tolist()
+        newValuesFull=[]
+        for dpi in range(len(dataset["values"])):
+            val = dataset["values"][dpi]
+            val["value"]=newVals[dpi]
+            newValuesFull.append(val)
+        dataset["values"] = newValuesFull
+        newData.append(dataset)
+    return newData
+
 @app.route('/outlier', methods=['POST'])
 async def outlier():
     if request.method == 'POST':
+        data=[]
         newObjects = []
-        for objectSet in request.json["data"]:
+        if request.json["dynamic"]==True:
+            for objectSet in request.json["data"]:
+                data.append(makeDynamic(objectSet))
+        else:
+            data = request.json["data"]
+        for objectSet in data:
             outliers = outlierFuzzy(objectSet)
             newObjects.append(outliers)
         return {
