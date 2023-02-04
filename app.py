@@ -354,15 +354,27 @@ def triangleMembership(value,functionSets):
         membershipValue = 0
         if fsi == 0:
             if value<=functionSets[fsi][2] and value>=functionSets[fsi][1]:
-                membershipValue = (functionSets[fsi][2]-value)/(functionSets[fsi][2]-functionSets[fsi][1])
+                if (functionSets[fsi][2]-functionSets[fsi][1])==0:
+                    membershipValue=1
+                else:
+                    membershipValue = (functionSets[fsi][2]-value)/(functionSets[fsi][2]-functionSets[fsi][1])
         if fsi == len(functionSets)-1:
             if value<=functionSets[fsi][1] and value>=functionSets[fsi][0]:
-                membershipValue = (value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
+                if (functionSets[fsi][1]-functionSets[fsi][0])==0:
+                    membershipValue=1
+                else:
+                    membershipValue = (value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
         if fsi != len(functionSets)-1 and fsi != 0:
             if value<=functionSets[fsi][2] and value>=functionSets[fsi][1]:
-                membershipValue = (functionSets[fsi][2]-value)/(functionSets[fsi][2]-functionSets[fsi][1])
+                if (functionSets[fsi][2]-functionSets[fsi][1])==0:
+                    membershipValue=1
+                else:
+                    membershipValue = (functionSets[fsi][2]-value)/(functionSets[fsi][2]-functionSets[fsi][1])
             if value<=functionSets[fsi][1] and value>=functionSets[fsi][0]:
-                membershipValue = (value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
+                if (functionSets[fsi][1]-functionSets[fsi][0])==0:
+                    membershipValue=1
+                else:
+                    membershipValue = (value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
         mv.append(membershipValue)
     return mv
 
@@ -375,19 +387,31 @@ def trapezoidMembership(value,functionSets):
             if value<=functionSets[fsi][2] and value>=functionSets[fsi][0]:
                 membershipValue = 1
             if value<=functionSets[fsi][3] and value>=functionSets[fsi][2]:
-                membershipValue = (functionSets[fsi][3]-value)/(functionSets[fsi][3]-functionSets[fsi][2])
+                if (functionSets[fsi][3]-functionSets[fsi][2])==0:
+                    membershipValue=1
+                else:
+                    membershipValue = (functionSets[fsi][3]-value)/(functionSets[fsi][3]-functionSets[fsi][2])
         if fsi == len(functionSets)-1:
             if value<=functionSets[fsi][3] and value>=functionSets[fsi][1]:
                 membershipValue = 1
             if value<=functionSets[fsi][1] and value>=functionSets[fsi][0]:
-                membershipValue = (value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
+                if (functionSets[fsi][1]-functionSets[fsi][0])==0:
+                    membershipValue=1
+                else:
+                    membershipValue = (value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
         if fsi != len(functionSets)-1 and fsi != 0:
             if value<=functionSets[fsi][2] and value>=functionSets[fsi][1]:
                 membershipValue = 1
             if value<=functionSets[fsi][3] and value>=functionSets[fsi][2]:
-                membershipValue = (functionSets[fsi][3]-value)/(functionSets[fsi][3]-functionSets[fsi][2])
+                if (functionSets[fsi][3]-functionSets[fsi][2])==0:
+                    membershipValue=1
+                else:
+                    membershipValue = (functionSets[fsi][3]-value)/(functionSets[fsi][3]-functionSets[fsi][2])
             if value<=functionSets[fsi][1] and value>=functionSets[fsi][0]:
-                membershipValue = (value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
+                if (functionSets[fsi][1]-functionSets[fsi][0])==0:
+                    membershipValue=1
+                else:
+                    membershipValue = (value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
         mv.append(membershipValue)
     return mv
 
