@@ -482,12 +482,19 @@ def fuzzy():
             # result.append(newDict)
             result.append(newValues)
         currentEvals = result[0].copy()
+        print("currentEvals")
+        print(currentEvals)
         for r in result[1:]:
             for v in r:
                 index = findByKey(v["key"],currentEvals)
                 if (index>=0):
                     ceCopy = currentEvals[index].copy()
                     mv = list(map(lambda x, y: max(x,y), v["mv"], ceCopy["mv"]))
+                    # check outliers for combos
+                    if ceCopy["outlier"]>0:
+                        mv = ceCopy["mv"]
+                    if v["outlier"]>0:
+                        mv = v["mv"]
                     ceCopy["mv"] = mv
                     currentEvals[index] = ceCopy
                 else:
@@ -540,9 +547,7 @@ def regression():
         for fsi in content["data"]["fsi"]:
             for fei in content["data"]["fei"]:
                 X = np.array(list(fsi["values"])).astype(float)
-                X =  (X-np.min(X))/(np.max(X)-np.min(X))
                 y = np.array(list(fei["values"])).astype(float)
-                y =  (y-np.min(y))/(np.max(y)-np.min(y))
                 outliers = outlierRegression(X,y)
                 newX=[]
                 newY=[]
@@ -553,6 +558,8 @@ def regression():
                 if (content["data"]["outlier"]==True):
                     X=np.array(newX)
                     y=np.array(newY)
+                X =  (X-np.min(X))/(np.max(X)-np.min(X))
+                y =  (y-np.min(y))/(np.max(y)-np.min(y))
                 X_ = sm.add_constant(X.reshape(-1,1))
                 model = sm.OLS(y, X_).fit()
                 predictions = model.predict(X_)
@@ -621,8 +628,8 @@ def pca():
         # xr =  np.array(list(l))
         # l = map(lambda x: x[0], yr)
         # yr =  np.array(list(l))
-        X =  (xr-np.min(xr))/(np.max(xr)-np.min(xr))
-        y =  (yr-np.min(yr))/(np.max(yr)-np.min(yr))
+        X=xr
+        y=yr
         
         outliers = outlierRegression(X,y)
         newX=[]
@@ -634,6 +641,8 @@ def pca():
         if (content["data"]["outlier"]==True):
             X=np.array(newX)
             y=np.array(newY)
+        X =  (X-np.min(X))/(np.max(X)-np.min(X))
+        y =  (y-np.min(y))/(np.max(y)-np.min(y))
         X_ = sm.add_constant(X.reshape(-1,1))
         model = sm.OLS(y, X_).fit()
         predictions = model.predict(X_)
