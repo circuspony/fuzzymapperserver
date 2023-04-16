@@ -15,7 +15,8 @@ from matplotlib.figure import Figure
 import statsmodels.api as sm
 from sklearn.decomposition import PCA
 from fuzzy_clustering.core.fuzzy import GK
-
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import scale, normalize
 
 app = Flask(__name__)
 CORS(app) 
@@ -600,20 +601,44 @@ def pca():
         xr=np.array(x[0]).astype(float)
         yr=np.array(y[0]).astype(float)
 
+        scaler = StandardScaler()
+        # xr = xr.reshape(-1,1)
+        # xr = scaler.fit_transform(xr)
+        # xr = list(map(lambda x: x[0], xr))
+        # yr = yr.reshape(-1,1)
+        # yr = scaler.fit_transform(yr)
+        # yr = list(map(lambda x: x[0], yr))
+
+        # xr =  (xr-np.min(xr))/(np.max(xr)-np.min(xr))
+        # yr =  (yr-np.min(yr))/(np.max(yr)-np.min(yr))
+
         pca = PCA(n_components=1,whiten=True)
         if len(x)>1:
             for xri in x[1:]:
                 xra=np.array(xri).astype(float)
+
+                # xra = xra.reshape(-1,1)
+                # xra = scaler.fit_transform(xra)
+                # xra = list(map(lambda x: x[0], xra))
+
+                # xra =  (xra-np.min(xra))/(np.max(xra)-np.min(xra))
                 xr = np.column_stack((xr, xra))
-            xr = pca.fit_transform(xr)
+            xr1 = scaler.fit_transform(xr)
+            xr = pca.fit_transform(xr1)
         else:
             l = map(lambda x: [x], xr)
             xr =  np.array(list(l))
         if len(y)>1:
             for yri in y[1:]:
                 yra=np.array(yri).astype(float)
+                # yra = yra.reshape(-1,1)
+                # yra = scaler.fit_transform(yra)
+                # yra = list(map(lambda x: x[0], yra))
+
+                # yra =  (yra-np.min(yra))/(np.max(yra)-np.min(yra))
                 yr = np.column_stack((yr, yra))
-            yr = pca.fit_transform(yr)
+            yr1 = scaler.fit_transform(yr)
+            yr = pca.fit_transform(yr1)
         else:
             l = map(lambda x: [x], yr)
             yr =  np.array(list(l))
@@ -623,7 +648,8 @@ def pca():
         if content["data"]["reverseY"]==True:
             l = map(lambda y: [-y[0]], yr)
             yr =  np.array(list(l))
-
+        print("pca.components_")
+        print(pca.components_)
         # l = map(lambda x: x[0], xr)
         # xr =  np.array(list(l))
         # l = map(lambda x: x[0], yr)
@@ -696,7 +722,7 @@ def clustercomp():
                 if matrix[mr][m]/summr>maxPercent:
                     maxPercent = matrix[mr][m]/summr
                 matrix[mr][m]=matrix[mr][m]/summr
-            v=(maxPercent-1/summr)/(1-1/summr)
+            v=(maxPercent-1/len(labels2[0]))/(1-1/len(labels2[0]))
             result.append(v)
         return {
         "status": "ok",
