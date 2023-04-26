@@ -483,8 +483,6 @@ def fuzzy():
             # result.append(newDict)
             result.append(newValues)
         currentEvals = result[0].copy()
-        print("currentEvals")
-        print(currentEvals)
         for r in result[1:]:
             for v in r:
                 index = findByKey(v["key"],currentEvals)
@@ -544,6 +542,81 @@ def outlierRegression(x,y):
 def regression():
     if request.method == 'POST':
         content = request.json
+        newRegressions = []
+
+        for fsi in content["data"]["fsi"]:
+            for fei in content["data"]["fei"]:
+                X = np.array(list(fsi["values"])).astype(float)
+                y = np.array(list(fei["values"])).astype(float)
+                clusterLabels = content["data"]["iv"]
+                l = map(lambda x: x.index(max(x)), clusterLabels)
+                clusterLabelsNonFuzzy =  np.array(list(l))
+                outliers = outlierRegression(X,y)
+                newX=[]
+                newY=[]
+                clusterLabelsNonFuzzyNew = []
+                for xi in range(len(X)):
+                    if outliers[xi]==0:
+                        newX.append(X[xi])
+                        newY.append(y[xi])
+                        clusterLabelsNonFuzzyNew.append(clusterLabelsNonFuzzy[xi])
+                if (content["data"]["outlier"]==True):
+                    X=np.array(newX)
+                    y=np.array(newY)
+                    clusterLabelsNonFuzzy=clusterLabelsNonFuzzyNew
+                legacyX = X
+                legacyY = y
+                pairInfo = []
+                for clusterIndex in range(len(clusterLabels[0])):
+                    X = legacyX
+                    y = legacyY
+                    newX=[]
+                    newY=[]
+                    for xi in range(len(clusterLabelsNonFuzzy)):
+                        if clusterLabelsNonFuzzy[xi]==clusterIndex:
+                            newX.append(X[xi])
+                            newY.append(y[xi])
+                    X = newX
+                    y = newY
+                    if len(X) <= 1 or len(y) <= 1:
+                        data={
+                        "from":fsi["name"],
+                        "to":fei["name"],
+                        "term":clusterIndex,
+                        "b":0,
+                        "r2":0,
+                        "F":0,
+                        "p":0,
+                        "x":[],
+                        "y":[],
+                        "a":0
+                        }
+                        pairInfo.append(data)
+                        continue
+                    X =  (X-np.min(X))/(np.max(X)-np.min(X))
+                    y =  (y-np.min(y))/(np.max(y)-np.min(y))
+                    X_ = sm.add_constant(X.reshape(-1,1))
+                    model = sm.OLS(y, X_).fit()
+                    b = model.params.tolist()[1]
+                    a = model.params.tolist()[0]
+                    r2 = model.rsquared
+                    F = model.fvalue
+                    p = model.f_pvalue
+                    data={
+                            "from":fsi["name"],
+                            "to":fei["name"],
+                            "term":clusterIndex,
+                            "b":b,
+                            "r2":r2,
+                            "F":F,
+                            "p":p,
+                            "x":X.tolist(),
+                            "y":y.tolist(),
+                            "a":a
+                    }
+                    pairInfo.append(data)
+                newRegressions.append(pairInfo)
+
         regressions = []
         for fsi in content["data"]["fsi"]:
             for fei in content["data"]["fei"]:
@@ -585,6 +658,7 @@ def regression():
         return {
         "status": "ok",
         "regressions":regressions,
+        "newRegressions":newRegressions,
         "headers": {"Access-Control-Allow-Origin": "*"}
         }
     return {
@@ -596,6 +670,8 @@ def regression():
 def pca():
     if request.method == 'POST':
         content = request.json
+        
+        newRegressions = []
         x=content["data"]["fsi"]
         y=content["data"]["fei"]
         xr=np.array(x[0]).astype(float)
@@ -648,8 +724,6 @@ def pca():
         if content["data"]["reverseY"]==True:
             l = map(lambda y: [-y[0]], yr)
             yr =  np.array(list(l))
-        print("pca.components_")
-        print(pca.components_)
         # l = map(lambda x: x[0], xr)
         # xr =  np.array(list(l))
         # l = map(lambda x: x[0], yr)
@@ -657,16 +731,79 @@ def pca():
         X=xr
         y=yr
         
+
+
+
         outliers = outlierRegression(X,y)
+        clusterLabels = content["data"]["iv"]
+        l = map(lambda x: x.index(max(x)), clusterLabels)
+        clusterLabelsNonFuzzy =  np.array(list(l))
         newX=[]
         newY=[]
+        clusterLabelsNonFuzzyNew = []
+
         for xi in range(len(X)):
             if outliers[xi]==0:
                 newX.append(X[xi])
                 newY.append(y[xi])
+                clusterLabelsNonFuzzyNew.append(clusterLabelsNonFuzzy[xi])
         if (content["data"]["outlier"]==True):
             X=np.array(newX)
             y=np.array(newY)
+            clusterLabelsNonFuzzy=clusterLabelsNonFuzzyNew
+
+        legacyX = X
+        legacyY = y
+        pairInfo = []
+        for clusterIndex in range(len(clusterLabels[0])):
+            X = legacyX
+            y = legacyY
+            newX=[]
+            newY=[]
+            for xi in range(len(clusterLabelsNonFuzzy)):
+                if clusterLabelsNonFuzzy[xi]==clusterIndex:
+                    newX.append(X[xi])
+                    newY.append(y[xi])
+            X = newX
+            y = newY
+            if len(X) <= 1 or len(y) <= 1:
+                data={
+                        "term":clusterIndex,
+                        "b":0,
+                        "r2":0,
+                        "F":0,
+                        "p":0,
+                        "x":[],
+                        "y":[],
+                        "a":0
+                }
+                pairInfo.append(data)
+                continue
+            X =  (X-np.min(X))/(np.max(X)-np.min(X))
+            y =  (y-np.min(y))/(np.max(y)-np.min(y))
+            X_ = sm.add_constant(X.reshape(-1,1))
+            model = sm.OLS(y, X_).fit()
+            b = model.params.tolist()[1]
+            a = model.params.tolist()[0]
+            r2 = model.rsquared
+            F = model.fvalue
+            p = model.f_pvalue
+            data={
+                "term":clusterIndex,
+                "b":b,
+                "r2":r2,
+                "F":F,
+                "p":p,
+                "x":X.tolist(),
+                "y":y.tolist(),
+                "a":a
+            }
+            pairInfo.append(data)
+
+
+        X = legacyX
+        y = legacyY
+
         X =  (X-np.min(X))/(np.max(X)-np.min(X))
         y =  (y-np.min(y))/(np.max(y)-np.min(y))
         X_ = sm.add_constant(X.reshape(-1,1))
@@ -689,6 +826,7 @@ def pca():
         return {
         "status": "ok",
         "regression":data,
+        "newRegression":pairInfo,
         "headers": {"Access-Control-Allow-Origin": "*"}
         }
     return {
@@ -703,6 +841,8 @@ def clustercomp():
         content = request.json
         labels1 = content["data"]["iv"]
         labels2 = content["data"]["ov"]
+        ic = len(labels1[0])
+        oc = len(labels2[0])
         matrix = [[0]*len(labels2[0]) for i in range(len(labels1[0]))]
         l = map(lambda x: x.index(max(x)), labels1)
         labels1 =  np.array(list(l))
@@ -722,7 +862,7 @@ def clustercomp():
                 if matrix[mr][m]/summr>maxPercent:
                     maxPercent = matrix[mr][m]/summr
                 matrix[mr][m]=matrix[mr][m]/summr
-            v=(maxPercent-1/len(labels2[0]))/(1-1/len(labels2[0]))
+            v=(maxPercent-1/oc)/(1-1/oc)
             result.append(v)
         return {
         "status": "ok",
