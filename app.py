@@ -548,7 +548,13 @@ def regression():
             for fei in content["data"]["fei"]:
                 X = np.array(list(fsi["values"])).astype(float)
                 y = np.array(list(fei["values"])).astype(float)
-                clusterLabels = content["data"]["iv"]
+                clusterLabels = []
+                
+                if (content["data"]["iv"] == None):
+                    cl = map(lambda x: [1], X)
+                    clusterLabels =  list(cl)
+                else:
+                    clusterLabels = content["data"]["iv"]
                 l = map(lambda x: x.index(max(x)), clusterLabels)
                 clusterLabelsNonFuzzy =  np.array(list(l))
                 outliers = outlierRegression(X,y)
@@ -733,9 +739,13 @@ def pca():
         
 
 
-
         outliers = outlierRegression(X,y)
-        clusterLabels = content["data"]["iv"]
+        clusterLabels = []
+        if (content["data"]["iv"] == None):
+            cl = map(lambda x: [1], X)
+            clusterLabels =  list(cl)
+        else:
+            clusterLabels = content["data"]["iv"]
         l = map(lambda x: x.index(max(x)), clusterLabels)
         clusterLabelsNonFuzzy =  np.array(list(l))
         newX=[]
