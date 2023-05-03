@@ -17,6 +17,7 @@ from sklearn.decomposition import PCA
 from fuzzy_clustering.core.fuzzy import GK
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import scale, normalize
+import itertools
 
 app = Flask(__name__)
 CORS(app) 
@@ -737,8 +738,6 @@ def pca():
         X=xr
         y=yr
         
-
-
         outliers = outlierRegression(X,y)
         clusterLabels = []
         if (content["data"]["iv"] == None):
@@ -884,6 +883,94 @@ def clustercomp():
         "status": "error",
         "headers": {"Access-Control-Allow-Origin": "*"}
     }
+
+def calculateIndirectY(X,newFactors):
+    Y = 0
+    mu = 0
+    for variant in itertools.product(*X):
+        print("variant")
+        aggrW = 0
+        muY = 1
+        Yasterisk = 0
+        for v in range(len(variant)):
+            aggrW = aggrW + float(newFactors[v]["influence"][variant[v]["eval"]])
+            muY = min(muY,variant[v]["evalValue"], variant[v]["coef"])
+
+        for v in range(len(variant)):
+            Yasterisk=Yasterisk+variant[v]["value"]*newFactors[v]["influence"][variant[v]["eval"]]/aggrW
+        Y = Y+Yasterisk*muY
+        mu = mu+muY
+    if mu!=0:
+        Y=Y/mu
+    else:
+        Y =0 
+    return Y
+
+@app.route('/indirectacc', methods=['POST'])
+async def indirectacc():
+    if request.method == 'POST':
+        content = request.json
+        factors = content["factors"]
+        newFactors = []
+        # prepare
+        for f in factors:
+            data = {}
+            if (f["evals"]== None):
+                cl = map(lambda x: [1], f["indicators"][0]["values"])
+                f["evals"] =  list(cl)
+            
+            if len(f["influence"]) != len(f["evals"][0]):
+                data["influence"] = [f["influence"][0]]*len(f["evals"][0])
+            else:
+                data["influence"] = f["influence"]
+            print(data)
+            findicators = []
+            for fi in f["indicators"]:
+                evalValues = []
+                data["coef"] = fi["coef"]
+                for evalIndex in range(len(f["evals"][0])):
+                    nonZeroELements = []
+                    nonZeroELementsValues = []
+                    for v in range(len(fi["values"])):
+                        if f["evals"][v][evalIndex] > 0:
+                            nonZeroELements.append({"obj":v,"eval":evalIndex,"evalValue":f["evals"][v][evalIndex],"coef":fi["coef"]})
+                            nonZeroELementsValues.append(fi["values"][v])
+                    
+                    if len(nonZeroELementsValues)>1:
+                        nonZeroELementsValues = np.array(nonZeroELementsValues).astype(float)
+                        nonZeroELementsValues =  (nonZeroELementsValues-np.min(nonZeroELementsValues))/(np.max(nonZeroELementsValues)-np.min(nonZeroELementsValues))
+                    if len(nonZeroELementsValues)==1:
+                        nonZeroELementsValues[0] = 1
+                    for nzei in range(len(nonZeroELementsValues)):
+                        nonZeroELements[nzei]["value"] = nonZeroELementsValues[nzei]
+                    evalValues.append(nonZeroELements)
+                findicators.append(evalValues)
+            data["findicators"] = findicators
+            newFactors.append(data)
+        # go through objects to get predictions
+        predictions = []
+        for objectIndex in range(len(factors[0]["indicators"][0]["values"])):
+            xs = []
+            for f in newFactors:
+                myX = []
+                for fi in f["findicators"]:
+                    for el in fi:
+                        for eli in el:
+                            if eli["obj"] == objectIndex:
+                                myX.append(eli)
+                xs.append(myX)
+            Y = calculateIndirectY(xs,newFactors)
+            predictions.append(Y)
+        return {
+        "status": "ok",
+        "predictions":predictions,
+        "headers": {"Access-Control-Allow-Origin": "*"}
+        }
+    return {
+        "status": "error",
+        "headers": {"Access-Control-Allow-Origin": "*"}
+    }
+
 
 @app.route('/accumulation', methods=['POST'])
 async def accumulation():
