@@ -1015,6 +1015,98 @@ async def accumulation():
         "headers": {"Access-Control-Allow-Origin": "*"}
     }
 
+@app.route('/pcaprognosis', methods=['POST'])
+async def pcaprognosis():
+    if request.method == 'POST':
+        content = request.json["data"]
+        currentObj = content["currentPrognosisObject"]
+        indChanges = content["indIn"]
+        iv = content["iv"]
+        l = map(lambda x: x.index(max(x)), iv)
+        clusterLabelsNonFuzzy =  np.array(list(l))
+        neededCluster = clusterLabelsNonFuzzy[currentObj]
+        connection = content["connection"]
+        fcEval=[]
+        if len(iv[0])==len(connection["fcEval"]):
+            fcEval = connection["fcEval"]
+        else:
+            fcEval = [connection["fcEval"][0]]*len(iv[0])
+
+        
+        newValues = []
+
+        x=content["fsi"]
+        y=content["fei"]
+        xr=np.array(x[0]["values"]).astype(float)
+        newValueX = float(x[0]["values"][currentObj])+float(x[0]["change"])*0.01*float(x[0]["values"][currentObj])
+        xr = np.append(xr,newValueX)
+        newValues.append(newValueX)
+        yr=np.array(y[0]["values"]).astype(float)
+        scaler = StandardScaler()
+        pca = PCA(n_components=1,whiten=True)
+        if len(x)>1:
+            for xri in x[1:]:
+                xra=np.array(xri["values"]).astype(float)
+                newValueX = float(xri["values"][currentObj])+float(xri["change"])*0.01*float(xri["values"][currentObj])
+                newValues.append(newValueX)
+                xra = np.append(xra,newValueX)
+                xr = np.column_stack((xr, xra))
+            xr1 = scaler.fit_transform(xr)
+            xr = pca.fit_transform(xr1)
+        else:
+            l = map(lambda x: [x], xr)
+            xr =  np.array(list(l))
+        if len(y)>1:
+            for yri in y[1:]:
+                yra=np.array(yri["values"]).astype(float)
+                yr = np.column_stack((yr, yra))
+            yr1 = scaler.fit_transform(yr)
+            yr = pca.fit_transform(yr1)
+        else:
+            l = map(lambda x: [x], yr)
+            yr =  np.array(list(l))
+        X=xr
+        y=yr
+        newCountX = X[-1][0]
+        oldCountX = X[currentObj][0]
+
+        newX=[]
+        newY=[]
+        currentObjNew = 0
+        for xi in range(len(clusterLabelsNonFuzzy)):
+            if xi==currentObj:
+                currentObjNew = len(newX)
+            if clusterLabelsNonFuzzy[xi]==neededCluster:
+                newX.append(X[xi][0])
+                newY.append(y[xi][0])
+
+        maxX = np.max(X)
+        minX = np.min(X)
+        maxY = np.max(y)
+        minY = np.min(y)
+
+        X =  (X-np.min(X))/(np.max(X)-np.min(X))
+        y =  (y-np.min(y))/(np.max(y)-np.min(y))
+
+        newCountX =  (newCountX-minX)/(maxX-minX)
+        oldCountX = X[currentObjNew][0]
+        oldCountY = y[currentObjNew][0]
+        bPCA=fcEval[neededCluster]
+        newCountY = oldCountY+(newCountX-oldCountX)*bPCA
+
+        return {
+        "status": "ok",
+        "newValues":newValues,
+        "oldCountY":oldCountY,
+        "newCountY":newCountY,
+        "headers": {"Access-Control-Allow-Origin": "*"}
+        }
+    return {
+        "status": "error",
+        "headers": {"Access-Control-Allow-Origin": "*"}
+    }
+
+
 @app.route('/test', methods=['POST'])
 async def test():
     if request.method == 'POST':
