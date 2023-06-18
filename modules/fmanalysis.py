@@ -20,6 +20,35 @@ def outlierHighMembership(val, o15, o30):
     return membershipValue
 
 
+def outlierRegression(x, y):
+    X = np.sort(x)
+    q25 = np.quantile(X, 0.25)
+    q75 = np.quantile(X, 0.75)
+    IQD = q75-q25
+    outlierLower15 = q25-1.5*IQD
+    outlierHigher15 = q75+1.5*IQD
+    outlierLower30 = q25-3*IQD
+    outlierHigher30 = q75+3*IQD
+    outliers = []
+    for xo in x:
+        if xo > outlierHigher15 or xo < outlierLower15:
+            outliers.append(1)
+            continue
+        outliers.append(0)
+    Y = np.sort(y)
+    q25 = np.quantile(Y, 0.25)
+    q75 = np.quantile(Y, 0.75)
+    IQD = q75-q25
+    outlierLower15 = q25-1.5*IQD
+    outlierHigher15 = q75+1.5*IQD
+    outlierLower30 = q25-3*IQD
+    outlierHigher30 = q75+3*IQD
+    for yi in range(len(y)):
+        if y[yi] > outlierHigher15 or y[yi] < outlierLower15:
+            outliers[yi] = 1
+    return outliers
+
+
 def findOutliersIn(dataArray):
     newObjects = []
     for valueArray in dataArray:
@@ -172,3 +201,23 @@ def makeDynamic(data):
         dataset["values"] = newValuesFull
         newData.append(dataset)
     return newData
+
+
+# async def correlations():
+#     if request.method == 'POST':
+#         content = request.json
+#         dfData = {}
+#         for nameIndex in range(len(content["fields"])):
+#             dfData[content["fields"][nameIndex]] = list(
+#                 np.float_(content["data"][nameIndex]))
+#         pd.set_option('display.max_colwidth', 0)
+#         df = pd.DataFrame(data=dfData)
+#         return {
+#             "status": "ok",
+#             "corr": df.corr().to_numpy().tolist(),
+#             "headers": {"Access-Control-Allow-Origin": "*"}
+#         }
+#     return {
+#         "status": "error",
+#         "headers": {"Access-Control-Allow-Origin": "*"}
+#     }

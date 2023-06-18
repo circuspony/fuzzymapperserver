@@ -1,9 +1,17 @@
 from modules.fmanalysis import fmtest
 from modules.fmanalysis import findOutliersIn
+from modules.fmanalysis import outlierRegression
 from modules.fmanalysis import outlierFuzzy
 from modules.fmanalysis import makeDynamic
 from modules.fmanalysis import outlierLowMembership
 from modules.fmanalysis import outlierHighMembership
+
+
+from modules.fmfactors import calculateIndirectY
+from modules.fmfactors import triangleMembership
+from modules.fmfactors import trapezoidMembership
+from modules.fmfactors import fss
+
 
 import itertools
 from sklearn.preprocessing import scale, normalize
@@ -11,7 +19,6 @@ from sklearn.preprocessing import StandardScaler
 from fuzzy_clustering.core.fuzzy import GK
 from sklearn.decomposition import PCA
 import statsmodels.api as sm
-from matplotlib.figure import Figure
 from flask import Flask
 from flask import request
 from flask import send_from_directory
@@ -19,7 +26,6 @@ from flask_cors import CORS
 import numpy as np
 from fcmeans import FCM
 import pandas as pd
-import uuid
 import matplotlib
 matplotlib.use('Agg')
 
@@ -44,6 +50,7 @@ async def clusters():
                 l0 = map(lambda x: [x], content["data"][index])
                 a0 = np.array(list(l0))
                 result = np.hstack((result, a0))
+
         X = result.astype(float)
         newX = []
         for notOi in range(len(outliers["o"])):
@@ -52,17 +59,25 @@ async def clusters():
         newX = np.array(newX)
         if content["outlier"] == True:
             X = newX
+
+        scaler = StandardScaler()
+
+        if content["standard"] == True:
+            X = scaler.fit_transform(X)
         fcm_centers = None
         fcm_labels = None
+        fuzzyS = 0
         if content["cmethod"] == "CM":
             fcm = FCM(n_clusters=content["clusters"])
             fcm.fit(X)
             fcm_centers = fcm.centers.tolist()
             fcm_labels = fcm.soft_predict(X).tolist()
+            fuzzyS = fss(X, fcm.soft_predict(X), content["clusters"])
         if content["cmethod"] == "GK":
             m, v, f = GK(X, c=content["clusters"])
             fcm_centers = v.tolist()
             fcm_labels = m.tolist()
+            fuzzyS = fss(X, m, content["clusters"])
         if content["outlier"] == True:
             for i in range(len(fcm_labels)):
                 label = fcm_labels[i]
@@ -82,6 +97,7 @@ async def clusters():
             "status": "ok",
             "centers": fcm_centers,
             "labels": fcm_labels,
+            "fuzzyS": fuzzyS,
             "headers": {"Access-Control-Allow-Origin": "*"}
         }
     return {
@@ -133,84 +149,6 @@ async def outlier():
         "status": "error",
         "headers": {"Access-Control-Allow-Origin": "*"}
     }
-
-
-def triangleMembership(value, functionSets):
-    value = float(value)
-    mv = []
-    for fsi in range(len(functionSets)):
-        membershipValue = 0
-        if fsi == 0:
-            if value <= functionSets[fsi][2] and value >= functionSets[fsi][1]:
-                if (functionSets[fsi][2]-functionSets[fsi][1]) == 0:
-                    membershipValue = 1
-                else:
-                    membershipValue = (
-                        functionSets[fsi][2]-value)/(functionSets[fsi][2]-functionSets[fsi][1])
-        if fsi == len(functionSets)-1:
-            if value <= functionSets[fsi][1] and value >= functionSets[fsi][0]:
-                if (functionSets[fsi][1]-functionSets[fsi][0]) == 0:
-                    membershipValue = 1
-                else:
-                    membershipValue = (
-                        value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
-        if fsi != len(functionSets)-1 and fsi != 0:
-            if value <= functionSets[fsi][2] and value >= functionSets[fsi][1]:
-                if (functionSets[fsi][2]-functionSets[fsi][1]) == 0:
-                    membershipValue = 1
-                else:
-                    membershipValue = (
-                        functionSets[fsi][2]-value)/(functionSets[fsi][2]-functionSets[fsi][1])
-            if value <= functionSets[fsi][1] and value >= functionSets[fsi][0]:
-                if (functionSets[fsi][1]-functionSets[fsi][0]) == 0:
-                    membershipValue = 1
-                else:
-                    membershipValue = (
-                        value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
-        mv.append(membershipValue)
-    return mv
-
-
-def trapezoidMembership(value, functionSets):
-    value = float(value)
-    mv = []
-    for fsi in range(len(functionSets)):
-        membershipValue = 0
-        if fsi == 0:
-            if value <= functionSets[fsi][2] and value >= functionSets[fsi][0]:
-                membershipValue = 1
-            if value <= functionSets[fsi][3] and value >= functionSets[fsi][2]:
-                if (functionSets[fsi][3]-functionSets[fsi][2]) == 0:
-                    membershipValue = 1
-                else:
-                    membershipValue = (
-                        functionSets[fsi][3]-value)/(functionSets[fsi][3]-functionSets[fsi][2])
-        if fsi == len(functionSets)-1:
-            if value <= functionSets[fsi][3] and value >= functionSets[fsi][1]:
-                membershipValue = 1
-            if value <= functionSets[fsi][1] and value >= functionSets[fsi][0]:
-                if (functionSets[fsi][1]-functionSets[fsi][0]) == 0:
-                    membershipValue = 1
-                else:
-                    membershipValue = (
-                        value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
-        if fsi != len(functionSets)-1 and fsi != 0:
-            if value <= functionSets[fsi][2] and value >= functionSets[fsi][1]:
-                membershipValue = 1
-            if value <= functionSets[fsi][3] and value >= functionSets[fsi][2]:
-                if (functionSets[fsi][3]-functionSets[fsi][2]) == 0:
-                    membershipValue = 1
-                else:
-                    membershipValue = (
-                        functionSets[fsi][3]-value)/(functionSets[fsi][3]-functionSets[fsi][2])
-            if value <= functionSets[fsi][1] and value >= functionSets[fsi][0]:
-                if (functionSets[fsi][1]-functionSets[fsi][0]) == 0:
-                    membershipValue = 1
-                else:
-                    membershipValue = (
-                        value - functionSets[fsi][0])/(functionSets[fsi][1]-functionSets[fsi][0])
-        mv.append(membershipValue)
-    return mv
 
 
 def findByKey(key, currentEvals):
@@ -313,35 +251,6 @@ def fuzzy():
         "status": "error",
         "headers": {"Access-Control-Allow-Origin": "*"}
     }
-
-
-def outlierRegression(x, y):
-    X = np.sort(x)
-    q25 = np.quantile(X, 0.25)
-    q75 = np.quantile(X, 0.75)
-    IQD = q75-q25
-    outlierLower15 = q25-1.5*IQD
-    outlierHigher15 = q75+1.5*IQD
-    outlierLower30 = q25-3*IQD
-    outlierHigher30 = q75+3*IQD
-    outliers = []
-    for xo in x:
-        if xo > outlierHigher15 or xo < outlierLower15:
-            outliers.append(1)
-            continue
-        outliers.append(0)
-    Y = np.sort(y)
-    q25 = np.quantile(Y, 0.25)
-    q75 = np.quantile(Y, 0.75)
-    IQD = q75-q25
-    outlierLower15 = q25-1.5*IQD
-    outlierHigher15 = q75+1.5*IQD
-    outlierLower30 = q25-3*IQD
-    outlierHigher30 = q75+3*IQD
-    for yi in range(len(y)):
-        if y[yi] > outlierHigher15 or y[yi] < outlierLower15:
-            outliers[yi] = 1
-    return outliers
 
 
 @app.route('/regression', methods=['POST'])
@@ -689,32 +598,6 @@ def clustercomp():
         "status": "error",
         "headers": {"Access-Control-Allow-Origin": "*"}
     }
-
-
-def calculateIndirectY(X, newFactors):
-    Y = 0
-    mu = 0
-    for variant in itertools.product(*X):
-        print("variant")
-        aggrW = 0
-        muY = 1
-        Yasterisk = 0
-        for v in range(len(variant)):
-            aggrW = aggrW + \
-                float(newFactors[v]["influence"][variant[v]["eval"]])
-            muY = min(muY, variant[v]["evalValue"], variant[v]["coef"])
-
-        for v in range(len(variant)):
-            Yasterisk = Yasterisk + \
-                variant[v]["value"] * \
-                newFactors[v]["influence"][variant[v]["eval"]]/aggrW
-        Y = Y+Yasterisk*muY
-        mu = mu+muY
-    if mu != 0:
-        Y = Y/mu
-    else:
-        Y = 0
-    return Y
 
 
 @app.route('/indirectacc', methods=['POST'])
